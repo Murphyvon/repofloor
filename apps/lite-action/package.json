@@ -1,0 +1,21 @@
+{
+  "name": "@repofloor/lite-action",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GitHub Action that snapshots repo activity into office-state.json and publishes the office to GitHub Pages",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/bundle.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test --import tsx tests/*.test.ts"
+  },
+  "dependencies": {
+    "@repofloor/protocol": "workspace:*",
+    "@repofloor/reducer": "workspace:*"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

@@ -1,0 +1,16 @@
+node_modules/
+dist/
+# the action bundle must be committed so `uses: repofloor/repofloor/apps/lite-action@main` works
+!apps/lite-action/dist/
+apps/lite-action/dist/*.map
+apps/lite-action/dist/*.d.ts
+apps/lite-action/dist/collect.js
+apps/lite-action/dist/main.js
+.turbo/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+.DS_Store
+coverage/
+apps/lite-action/node_modules/

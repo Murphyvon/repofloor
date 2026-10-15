@@ -1,0 +1,34 @@
+name: "Repofloor Lite"
+description: "Turn your repository's recent activity into a living pixel office, published to GitHub Pages."
+author: "Repofloor contributors"
+branding:
+  icon: "home"
+  color: "purple"
+
+inputs:
+  token:
+    description: "GitHub token (default GITHUB_TOKEN is enough for public repos)"
+    required: false
+    default: ${{ github.token }}
+  repository:
+    description: "owner/repo to snapshot (defaults to the current repository)"
+    required: false
+    default: ${{ github.repository }}
+  hours:
+    description: "Look-back window in hours"
+    required: false
+    default: "48"
+  output-dir:
+    description: "Directory to write the static office site into"
+    required: false
+    default: "repofloor-site"
+
+outputs:
+  output-dir:
+    description: "Directory containing index.html + office-state.json"
+  actors:
+    description: "Number of actors in the snapshot"
+
+runs:
+  using: "node20"
+  main: "dist/index.js"

@@ -1,0 +1,55 @@
+# Dogfooding: publish this repository's own office to GitHub Pages.
+# Other repositories copy this file (see docs/LITE.md) and change the `uses:` line.
+name: Repofloor office
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, closed, reopened, ready_for_review, review_requested]
+  pull_request_review:
+    types: [submitted]
+  issues:
+    types: [opened, closed, assigned]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  schedule:
+    - cron: "17 * * * *" # hourly, so idle/offline decay stays truthful
+  workflow_dispatch:
+
+concurrency:
+  group: repofloor-office
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  actions: read
+  pull-requests: read
+  issues: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Snapshot office
+        uses: ./apps/lite-action # external repos: uses: repofloor/repofloor/apps/lite-action@main
+        with:
+          hours: 72
+          output-dir: repofloor-site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: repofloor-site
+
+  deploy:
+    needs: snapshot
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

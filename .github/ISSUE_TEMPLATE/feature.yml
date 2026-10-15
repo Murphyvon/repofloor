@@ -1,0 +1,20 @@
+name: Feature idea
+description: Something the office should do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What should happen in the office?
+      placeholder: "When a PR gets 2 approvals, the author's desk gets a little flag…"
+    validations: { required: true }
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [engine (visual), reducer (behaviour), lite-action, full mode (api/realtime/web), docs]
+    validations: { required: true }
+  - type: textarea
+    id: why
+    attributes:
+      label: Why is it useful?
