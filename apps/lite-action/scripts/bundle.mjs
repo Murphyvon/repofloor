@@ -1,7 +1,7 @@
 // Bundles the action into a single dist/index.js (GitHub Actions can't resolve workspace deps)
 // and copies the demo's built static page as dist/site (the office page the action publishes).
 import { build } from "esbuild";
-import { cp, mkdir, access } from "node:fs/promises";
+import { cp, mkdir, access, rm } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -21,6 +21,8 @@ await build({
 const demoDist = join(root, "../demo/dist");
 try {
   await access(demoDist);
+  // wipe first: vite hashes asset names, so copying over an old site piles up stale files
+  await rm(join(root, "dist/site"), { recursive: true, force: true });
   await mkdir(join(root, "dist/site"), { recursive: true });
   await cp(demoDist, join(root, "dist/site"), { recursive: true });
   console.log("lite-action: bundled dist/index.js + dist/site");
