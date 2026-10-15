@@ -419,6 +419,10 @@ function input(name, fallback) {
   if (v === void 0) throw new Error(`Missing input: ${name}`);
   return v;
 }
+async function retitle(indexPath, repoFull) {
+  const html = await readFile(indexPath, "utf8");
+  await writeFile(indexPath, html.replace(/<title>[^<]*<\/title>/, `<title>${repoFull} \xB7 Repofloor office</title>`));
+}
 async function main() {
   const repoFull = input("repository", process.env["GITHUB_REPOSITORY"]);
   const [owner, repo] = repoFull.split("/");
@@ -433,6 +437,7 @@ async function main() {
   const site = join(here, "site");
   try {
     await cp(site, outDir, { recursive: true });
+    await retitle(join(outDir, "index.html"), repoFull);
   } catch {
     console.warn("repofloor: static site bundle not found at", site, "- only office-state.json written");
   }

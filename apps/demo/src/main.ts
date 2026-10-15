@@ -8,6 +8,7 @@ const logEl = document.getElementById("log")!;
 const controls = document.getElementById("controls")!;
 const modeEl = document.getElementById("mode")!;
 const clockEl = document.getElementById("clock")!;
+const titleEl = document.querySelector("header h1")!;
 
 const renderer = new OfficeRenderer({
   onActorClick: (a) => {
@@ -51,6 +52,9 @@ async function boot() {
     state = decay(lite, new Date().toISOString());
     renderer.setState(state);
     modeEl.textContent = `lite · generated ${new Date(lite.generatedAt).toLocaleString()}`;
+    // one published page per repository: say which one, in the header and the tab
+    titleEl.textContent = `🏢 ${lite.office.id}`;
+    document.title = `${lite.office.id} · Repofloor office`;
     return;
   }
 

@@ -13,6 +13,16 @@ function input(name: string, fallback?: string): string {
   return v;
 }
 
+/**
+ * The bundled page is the demo build, so its <title> says "Repofloor Demo".
+ * Every published office belongs to one repository — name it, for the browser tab
+ * and for link previews, which never run the page's JavaScript.
+ */
+async function retitle(indexPath: string, repoFull: string): Promise<void> {
+  const html = await readFile(indexPath, "utf8");
+  await writeFile(indexPath, html.replace(/<title>[^<]*<\/title>/, `<title>${repoFull} · Repofloor office</title>`));
+}
+
 async function main() {
   const repoFull = input("repository", process.env["GITHUB_REPOSITORY"]);
   const [owner, repo] = repoFull.split("/");
@@ -31,6 +41,7 @@ async function main() {
   const site = join(here, "site");
   try {
     await cp(site, outDir, { recursive: true });
+    await retitle(join(outDir, "index.html"), repoFull);
   } catch {
     console.warn("repofloor: static site bundle not found at", site, "- only office-state.json written");
   }
@@ -55,7 +66,6 @@ async function main() {
     ].join("\n");
     await writeFile(process.env["GITHUB_STEP_SUMMARY"], md, { flag: "a" });
   }
-  void readFile; // keep import for future "merge with previous state" step
 }
 
 main().catch((e) => {
