@@ -51,4 +51,10 @@ Starter list in [`docs/GOOD_FIRST_ISSUES.md`](docs/GOOD_FIRST_ISSUES.md) — if 
 ## Code of conduct
 
 Be kind, assume good intent, keep it welcoming to first-time contributors. We follow the
-[Contributor Covenant](https://www.contributor-covenant.org/version/2/1/code_of_conduct/).
+[Contributor Covenant](https://www.contributor-covenant.org/version/2/1/code_of_conduct/) —
+the full text is in [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
+
+## Security
+
+Found something that should not be public? Do not open an issue — see
+[`SECURITY.md`](SECURITY.md).

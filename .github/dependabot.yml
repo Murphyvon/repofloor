@@ -1,0 +1,28 @@
+# Keeps the workspace and the workflows current. The action bundle is committed, so a
+# dependency bump that reaches apps/lite-action still needs `pnpm build` before merging.
+version: 2
+updates:
+  - package-ecosystem: npm # pnpm workspace: one entry covers every package via the root lockfile
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      dev-tooling:
+        patterns: ["typescript", "tsx", "vite", "esbuild", "@types/*"]
+      pixi:
+        patterns: ["pixi.js"]
+    commit-message:
+      prefix: chore
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: chore
