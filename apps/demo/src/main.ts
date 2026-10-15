@@ -43,20 +43,26 @@ function log(ev: OfficeEvent) {
 }
 
 async function boot() {
-  await renderer.mount(host);
-
   // Lite mode: if ./office-state.json exists next to the page, use it and stop simulating.
   const lite = await fetch("./office-state.json").then((r) => (r.ok ? r.json() : null)).catch(() => null);
   if (lite) {
     assertOfficeState(lite);
-    state = decay(lite, new Date().toISOString());
-    renderer.setState(state);
-    modeEl.textContent = `lite · generated ${new Date(lite.generatedAt).toLocaleString()}`;
+    // shape the page before mounting, so the canvas is sized for the final layout:
+    // a published snapshot has no event stream, so the simulator's panel goes away
+    document.querySelector("aside")?.remove();
+    (document.querySelector("main") as HTMLElement | null)?.style.setProperty("grid-template-columns", "1fr");
     // one published page per repository: say which one, in the header and the tab
     titleEl.textContent = `🏢 ${lite.office.id}`;
     document.title = `${lite.office.id} · Repofloor office`;
+    modeEl.textContent = `lite · generated ${new Date(lite.generatedAt).toLocaleString()}`;
+
+    await renderer.mount(host);
+    state = decay(lite, new Date().toISOString());
+    renderer.setState(state);
     return;
   }
+
+  await renderer.mount(host);
 
   state = initialState();
   for (const ev of seedEvents()) apply(ev);

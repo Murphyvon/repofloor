@@ -37,6 +37,7 @@ It ships in two flavours that share the **same engine**:
 - **Full** — hosted. Sign in with GitHub, see every repo you have access to as an office, live presence, agent telemetry, rooms and chat. *In progress — see [ROADMAP](docs/ROADMAP.md).*
 
 This repository dogfoods itself: **[visit our office →](https://repofloor.github.io/repofloor/)**
+Drag to pan, scroll or use the **+ / −** buttons to zoom, double-click to fit the whole floor.
 
 ## Add the Lite office to your repo (2 minutes)
 

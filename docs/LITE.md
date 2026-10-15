@@ -33,6 +33,8 @@ Your office lives at `https://<owner>.github.io/<repo>/`. Add it to the README:
   idle, offline.
 - Open PRs and issues on the wall board; the CI lamp shows the default branch status.
 - Hourly cron keeps idle/offline decay honest even when nobody pushes.
+- A camera: drag to pan, scroll (or the +/- buttons) to zoom, double-click to fit the
+  whole floor again. A hundred-person office stays readable — zoom in on one corner.
 
 ## What you don't get (needs Full mode)
 

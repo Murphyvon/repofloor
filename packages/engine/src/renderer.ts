@@ -13,7 +13,16 @@ export interface OfficeRendererOptions {
   tooltip?: (actor: ActorState) => string;
   /** Background color behind the office. */
   background?: number;
+  /** Drag to pan, wheel/buttons to zoom. Default true. */
+  interactiveCamera?: boolean;
 }
+
+/** Zoom limits. The office is pixel art, so steps are quarters of a pixel scale. */
+const MIN_SCALE = 0.25;
+const MAX_SCALE = 6;
+const ZOOM_STEP = 0.25;
+/** Pointer travel (px) before a press counts as a pan instead of a click. */
+const DRAG_SLOP = 4;
 
 const ROOM_LABEL = new TextStyle({ fontFamily: "monospace", fontSize: 9, fill: PALETTE.textDim });
 const BOARD_STYLE = new TextStyle({ fontFamily: "monospace", fontSize: 8, fill: PALETTE.text });
@@ -43,11 +52,17 @@ export class OfficeRenderer {
   private tooltipEl: HTMLDivElement | null = null;
   private host: HTMLElement | null = null;
   private wanderTimer = 0;
+  private camera = { x: 0, y: 0, scale: 2 };
+  /** Once the user pans or zooms, stop re-fitting the office under them. */
+  private cameraTouched = false;
+  private dragged = false;
+  private cleanup: Array<() => void> = [];
   private opts: Required<Pick<OfficeRendererOptions, "scale" | "background">> & OfficeRendererOptions;
   private t = 0;
 
   constructor(opts: OfficeRendererOptions = {}) {
     this.opts = { scale: 2, background: 0x14161c, ...opts };
+    this.camera.scale = this.opts.scale;
   }
 
   async mount(host: HTMLElement): Promise<void> {
@@ -65,6 +80,18 @@ export class OfficeRenderer {
     this.world.scale.set(this.opts.scale);
     this.app.stage.addChild(this.world);
     this.app.ticker.add((ticker) => this.tick(ticker.deltaMS / 1000));
+    this.app.renderer.on("resize", () => this.fitToHost());
+    // `resizeTo` only reacts to window resizes; the host can also change on its own
+    // (a side panel closing, a responsive grid), so watch the element itself.
+    if (typeof ResizeObserver !== "undefined") {
+      const ro = new ResizeObserver(() => {
+        if (!this.host) return;
+        this.app.renderer.resize(this.host.clientWidth, this.host.clientHeight);
+        this.fitToHost();
+      });
+      ro.observe(host);
+      this.cleanup.push(() => ro.disconnect());
+    }
 
     this.tooltipEl = document.createElement("div");
     Object.assign(this.tooltipEl.style, {
@@ -82,12 +109,21 @@ export class OfficeRenderer {
     } as CSSStyleDeclaration);
     host.style.position ||= "relative";
     host.appendChild(this.tooltipEl);
+    this.setupCamera();
     if (this.state) this.setState(this.state);
   }
 
   destroy() {
+    for (const off of this.cleanup) off();
+    this.cleanup = [];
     this.app.destroy(true, { children: true });
     this.tooltipEl?.remove();
+  }
+
+  /** Re-centre and re-fit the office, discarding the user's pan/zoom. */
+  resetCamera() {
+    this.cameraTouched = false;
+    this.fitToHost();
   }
 
   /** Replace the whole state; avatars are diffed by id. */
@@ -102,16 +138,19 @@ export class OfficeRenderer {
     }
     const layout = this.layout!;
     const seen = new Set<string>();
+    const targets = this.resolveTargets(state, layout);
     for (const a of state.actors) {
       seen.add(a.actor.id);
       let av = this.avatars.get(a.actor.id);
-      const target = this.targetFor(a, layout);
+      const target = targets.get(a.actor.id)!;
       if (!av) {
         av = new Avatar(a);
         av.on("pointerover", (e) => this.showTooltip(av!, e.global.x, e.global.y));
         av.on("pointermove", (e) => this.showTooltip(av!, e.global.x, e.global.y));
         av.on("pointerout", () => this.hideTooltip());
-        av.on("pointertap", () => this.opts.onActorClick?.(av!.state));
+        av.on("pointertap", () => {
+          if (!this.dragged) this.opts.onActorClick?.(av!.state);
+        });
         this.avatars.set(a.actor.id, av);
         this.actorLayer.addChild(av);
         // new actors enter through the door
@@ -134,7 +173,7 @@ export class OfficeRenderer {
     }
     this.drawLamp(state);
     this.board.text = boardText(state);
-    this.title.text = `${state.office.id}`;
+    this.placeTitle(state.office.id);
     this.fitToHost();
   }
 
@@ -151,6 +190,37 @@ export class OfficeRenderer {
 
   // ───────────────────────────────────────────────────────────────────────────
 
+  /**
+   * One tile per actor. Desks and room seats are unique by construction, but the
+   * lounge and the door are not — with a big team everyone used to pile onto the
+   * same tile and their name labels became unreadable.
+   */
+  private resolveTargets(state: OfficeState, layout: Layout): Map<string, { tx: number; ty: number }> {
+    const out = new Map<string, { tx: number; ty: number }>();
+    const taken = new Set<string>();
+    for (const a of state.actors) {
+      let t = this.targetFor(a, layout);
+      for (let i = 1; taken.has(`${t.tx},${t.ty}`) && i <= 12; i++) {
+        // deterministic nudge: right, left, right… then down a row
+        const dx = (i % 2 ? 1 : -1) * Math.ceil(i / 2);
+        const tx = clamp(t.tx + dx, 1, layout.cols - 2);
+        const ty = clamp(t.ty + (i > 6 ? 1 : 0), 1, layout.rows - 2);
+        t = { tx, ty };
+      }
+      taken.add(`${t.tx},${t.ty}`);
+      out.set(a.actor.id, t);
+    }
+    return out;
+  }
+
+  /** Spread loungers across the lounge by a stable index instead of a hash. */
+  private loungeSpot(a: ActorState, layout: Layout): { tx: number; ty: number } {
+    const ids = (this.state?.actors ?? []).map((x) => x.actor.id).sort();
+    const i = Math.max(0, ids.indexOf(a.actor.id));
+    const l = layout.lounge;
+    return { tx: l.tx + (i % l.tw), ty: l.ty + (Math.floor(i / l.tw) % Math.max(1, l.th)) };
+  }
+
   private targetFor(a: ActorState, layout: Layout): { tx: number; ty: number } {
     if (a.roomId) {
       const box = layout.rooms.find((r) => r.room.id === a.roomId);
@@ -165,13 +235,11 @@ export class OfficeRenderer {
     if (desk) {
       if (a.status === "idle" && hash(a.actor.id + Math.floor(this.t / 20)) % 3 === 0) {
         // idle people occasionally hang out in the lounge
-        const l = layout.lounge;
-        return { tx: l.tx + (hash(a.actor.id) % l.tw), ty: l.ty + 1 };
+        return this.loungeSpot(a, layout);
       }
       return { tx: desk.tx, ty: desk.ty };
     }
-    const l = layout.lounge;
-    return { tx: l.tx + (hash(a.actor.id) % l.tw), ty: l.ty + 1 };
+    return this.loungeSpot(a, layout);
   }
 
   private drawStatic(state: OfficeState, layout: Layout) {
@@ -238,8 +306,9 @@ export class OfficeRenderer {
         this.board.position.set(x + 4, y + 1);
         this.board.style.fill = 0x111318;
         this.propsLayer.addChild(this.board);
-        // repo title lives on the bottom wall, left of the door
-        this.title.position.set(TILE * 3, (layout.rows - 1) * TILE + 1);
+        // repo title sits on the top wall: the bottom one is where avatars enter and
+        // park, and their name labels collided with it
+        this.title.position.set(TILE, 2);
         this.propsLayer.addChild(this.title);
         continue;
       } else if (p.kind === "lamp") {
@@ -249,6 +318,25 @@ export class OfficeRenderer {
         pg.rect(x - 2, y, TILE + 4, TILE).fill(0x8b5e3c).rect(x, y + 2, TILE, TILE - 2).fill(0x6e4529).rect(x + TILE - 4, y + 8, 2, 2).fill(0xfbbf24);
       }
       this.propsLayer.addChild(pg);
+    }
+  }
+
+  /**
+   * The repo name sits on the top wall, left of the CI lamp. A narrow office (few
+   * desks, no rooms) leaves little room, so shorten rather than overlap.
+   */
+  private placeTitle(id: string) {
+    this.title.text = id;
+    const layout = this.layout;
+    if (!layout) return;
+    const lamp = layout.props.find((p) => p.kind === "lamp");
+    const max = ((lamp ? lamp.tx : layout.cols) - 1) * TILE - 6;
+    if (max <= 0 || this.title.width <= max) return;
+    let t = id.includes("/") ? id.slice(id.indexOf("/") + 1) : id; // drop the owner first
+    this.title.text = t;
+    while (this.title.width > max && t.length > 1) {
+      t = t.slice(0, -1);
+      this.title.text = `${t}…`;
     }
   }
 
@@ -314,10 +402,11 @@ export class OfficeRenderer {
     this.wanderTimer += dt;
     if (this.wanderTimer > 4 && this.state && this.layout) {
       this.wanderTimer = 0;
+      const targets = this.resolveTargets(this.state, this.layout);
       for (const a of this.state.actors) {
         const av = this.avatars.get(a.actor.id);
         if (av && !av.walking && a.status !== "offline") {
-          const t = this.targetFor(a, this.layout);
+          const t = targets.get(a.actor.id)!;
           av.moveTo(t.tx, t.ty);
         }
       }
@@ -326,17 +415,151 @@ export class OfficeRenderer {
     if (this.state?.defaultBranchCi === "running") this.lamp.alpha = 0.7 + Math.sin(this.t * 5) * 0.3;
   }
 
+  // ── camera ────────────────────────────────────────────────────────────────
+  // The office is one world container; panning moves it, zooming scales it.
+  // Scale stays on quarter steps so pixel art never lands on a blurry fraction.
+
   private fitToHost() {
+    if (!this.host || !this.layout) return;
+    if (!this.cameraTouched) this.fitCamera();
+    this.applyCamera();
+  }
+
+  /** Scale so the whole office is visible, centred. */
+  private fitCamera() {
     if (!this.host || !this.layout) return;
     const W = this.layout.cols * TILE;
     const H = this.layout.rows * TILE;
-    const sx = this.host.clientWidth / W;
-    const sy = this.host.clientHeight / H;
-    // Prefer integer scales (crisp pixels); fall back to half steps when the office doesn't fit.
-    const raw = Math.min(sx, sy, this.opts.scale * 2);
-    const s = Math.max(0.75, raw >= 2 ? Math.floor(raw) : Math.floor(raw * 4) / 4);
-    this.world.scale.set(s);
-    this.world.position.set(Math.floor((this.host.clientWidth - W * s) / 2), Math.floor((this.host.clientHeight - H * s) / 2));
+    const raw = Math.min(this.host.clientWidth / W, this.host.clientHeight / H, this.opts.scale * 2);
+    // integer scales above 2 (crispest), quarter steps below, so a crowded office still fits
+    this.camera.scale = clamp(raw >= 2 ? Math.floor(raw) : Math.floor(raw / ZOOM_STEP) * ZOOM_STEP, MIN_SCALE, MAX_SCALE);
+  }
+
+  /** Zoom by `factor` around a point in host (css pixel) coordinates. */
+  private zoomAt(factor: number, px: number, py: number) {
+    const from = this.camera.scale;
+    const to = clamp(Math.round((from * factor) / ZOOM_STEP) * ZOOM_STEP, MIN_SCALE, MAX_SCALE);
+    if (to === from) return;
+    // keep whatever sits under the pointer in place
+    this.camera.x = px - ((px - this.camera.x) * to) / from;
+    this.camera.y = py - ((py - this.camera.y) * to) / from;
+    this.camera.scale = to;
+    this.cameraTouched = true;
+    this.applyCamera();
+  }
+
+  private applyCamera() {
+    this.clampCamera();
+    this.world.scale.set(this.camera.scale);
+    // whole pixels only: fractional offsets smear the 16px tiles
+    this.world.position.set(Math.round(this.camera.x), Math.round(this.camera.y));
+  }
+
+  /** Centre an axis while the office fits on it; otherwise keep its edges outside the viewport. */
+  private clampCamera() {
+    if (!this.host || !this.layout) return;
+    const W = this.layout.cols * TILE * this.camera.scale;
+    const H = this.layout.rows * TILE * this.camera.scale;
+    const vw = this.host.clientWidth;
+    const vh = this.host.clientHeight;
+    this.camera.x = W <= vw ? (vw - W) / 2 : clamp(this.camera.x, vw - W, 0);
+    this.camera.y = H <= vh ? (vh - H) / 2 : clamp(this.camera.y, vh - H, 0);
+  }
+
+  private setupCamera() {
+    if (this.opts.interactiveCamera === false || !this.host) return;
+    const host = this.host;
+    const stage = this.app.stage;
+    stage.eventMode = "static";
+    stage.hitArea = this.app.screen; // the whole canvas drags, not just the floor
+
+    let dragging = false;
+    let travel = 0;
+    let lastX = 0;
+    let lastY = 0;
+    stage.on("pointerdown", (e) => {
+      dragging = true;
+      travel = 0;
+      this.dragged = false;
+      lastX = e.global.x;
+      lastY = e.global.y;
+      host.style.cursor = "grabbing";
+    });
+    const endDrag = () => {
+      dragging = false;
+      host.style.cursor = "grab";
+    };
+    stage.on("pointerup", endDrag);
+    stage.on("pointerupoutside", endDrag);
+    stage.on("globalpointermove", (e) => {
+      if (!dragging) return;
+      const dx = e.global.x - lastX;
+      const dy = e.global.y - lastY;
+      lastX = e.global.x;
+      lastY = e.global.y;
+      travel += Math.abs(dx) + Math.abs(dy);
+      if (travel < DRAG_SLOP) return; // a click on an avatar is still a click
+      this.dragged = true;
+      this.cameraTouched = true;
+      this.camera.x += dx;
+      this.camera.y += dy;
+      this.applyCamera();
+      this.hideTooltip();
+    });
+
+    const onWheel = (ev: WheelEvent) => {
+      ev.preventDefault();
+      const rect = host.getBoundingClientRect();
+      this.zoomAt(ev.deltaY < 0 ? 1.25 : 0.8, ev.clientX - rect.left, ev.clientY - rect.top);
+    };
+    host.addEventListener("wheel", onWheel, { passive: false });
+    const onDouble = () => this.resetCamera();
+    host.addEventListener("dblclick", onDouble);
+    host.style.cursor = "grab";
+    host.style.touchAction = "none";
+    this.cleanup.push(() => {
+      host.removeEventListener("wheel", onWheel);
+      host.removeEventListener("dblclick", onDouble);
+    });
+
+    this.buildCameraControls(host);
+  }
+
+  /** Small +/-/reset cluster, so zoom is discoverable without a wheel. */
+  private buildCameraControls(host: HTMLElement) {
+    const bar = document.createElement("div");
+    Object.assign(bar.style, {
+      position: "absolute",
+      right: "8px",
+      bottom: "8px",
+      display: "flex",
+      gap: "4px",
+      zIndex: "10",
+    } as CSSStyleDeclaration);
+    const make = (label: string, title: string, fn: () => void) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = label;
+      b.title = title;
+      Object.assign(b.style, {
+        width: "26px",
+        height: "26px",
+        background: "rgba(20,22,28,0.9)",
+        color: "#e8ebf2",
+        border: "1px solid #4a5265",
+        borderRadius: "4px",
+        font: "14px/1 ui-monospace, monospace",
+        cursor: "pointer",
+      } as CSSStyleDeclaration);
+      b.addEventListener("click", fn);
+      bar.appendChild(b);
+    };
+    const centre = (): [number, number] => [host.clientWidth / 2, host.clientHeight / 2];
+    make("−", "Zoom out", () => this.zoomAt(0.8, ...centre()));
+    make("+", "Zoom in", () => this.zoomAt(1.25, ...centre()));
+    make("⤢", "Fit the whole office", () => this.resetCamera());
+    host.appendChild(bar);
+    this.cleanup.push(() => bar.remove());
   }
 
   private showTooltip(av: Avatar, x: number, y: number) {
@@ -352,6 +575,10 @@ export class OfficeRenderer {
   private hideTooltip() {
     if (this.tooltipEl) this.tooltipEl.style.display = "none";
   }
+}
+
+function clamp(v: number, lo: number, hi: number): number {
+  return v < lo ? lo : v > hi ? hi : v;
 }
 
 function layoutKey(s: OfficeState): string {
