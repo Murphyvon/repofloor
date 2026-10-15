@@ -43,15 +43,16 @@ function log(ev: OfficeEvent) {
 }
 
 /** How often the published page looks for a newer snapshot, and how often it ages the one it has. */
-const LITE_POLL_MS = 60_000;
+const LITE_POLL_MS = 15_000;
 const LITE_DECAY_MS = 15_000;
 /** Floor between two fetches: visibilitychange can fire in bursts. */
 const LITE_MIN_GAP_MS = LITE_POLL_MS / 2;
 
 async function fetchLite(): Promise<OfficeState | null> {
   try {
-    // no-store: the page is long-lived and GitHub Pages caches aggressively
-    const r = await fetch("./office-state.json", { cache: "no-store" });
+    // no-cache, not no-store: Pages sends max-age=600 and an ETag, so revalidate every
+    // time (never serve a 10-minute-old copy) but let an unchanged poll answer 304.
+    const r = await fetch("./office-state.json", { cache: "no-cache" });
     if (!r.ok) return null;
     const json = await r.json();
     assertOfficeState(json);

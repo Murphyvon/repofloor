@@ -11,6 +11,8 @@ on:
     types: [submitted]
   issues:
     types: [opened, closed, assigned]
+  issue_comment:
+    types: [created] # a conversation is "happening now" too
   workflow_run:
     workflows: [CI]
     types: [completed]
@@ -19,8 +21,12 @@ on:
   workflow_dispatch:
 
 concurrency:
+  # Let a running snapshot finish instead of killing it: a push used to start one,
+  # then CI finishing cancelled it ~40s in and started over, so the office appeared
+  # ~70s after the push instead of ~30s. GitHub keeps only the newest pending run,
+  # so the floor stays current without the restart.
   group: repofloor-office
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read
