@@ -1,6 +1,6 @@
 # Handoff — where the project stands
 
-_Last updated: 2026-10-15 (initial skeleton)._
+_Last updated: 2026-10-15 (published to GitHub, starter issues opened)._
 
 ## Done (Phase 0)
 
@@ -11,23 +11,24 @@ _Last updated: 2026-10-15 (initial skeleton)._
 - Demo with simulator + manual event buttons. Verified in headless Chromium (screenshot in `docs/assets/office.png`).
 - Lite action: `collect.ts` (REST → events → replay with decay), bundled with esbuild, `action.yml`, Pages workflow dogfooding this repo.
 - Docs + templates for an open-source community.
+- Published: repo lives at <https://github.com/repofloor/repofloor>, Pages is on (Source: GitHub Actions) and the
+  dogfooded office is live at <https://repofloor.github.io/repofloor/>. The `CI` and `Repofloor office` workflows are green.
+- The 16 starter issues from `docs/GOOD_FIRST_ISSUES.md` are open as issues #1-#16, labelled `good first issue`
+  plus an area label (`engine`, `reducer`, `lite`, `demo`).
 
 ## Not yet done / known rough edges
 
 - Speech bubbles overlap when several actors in the top desk row talk at once (needs simple collision/stagger).
-- Avatars walk in straight lines through desks (A* on the tile grid — good first issue #5).
+- Avatars walk in straight lines through desks (A* on the tile grid — issue #5).
 - `applyEffect` is called by the demo; Lite page never calls it (no live events) — fine for now.
-- No engine unit tests (visual package). A Playwright screenshot workflow is good first issue #16.
+- No engine unit tests (visual package). A Playwright screenshot workflow is issue #16.
 - Lite `collect.ts` does not page beyond 100 commits / 50 PRs / 50 issues / 20 runs.
 - `monitors` map redraw happens per `setState` for every actor — cheap, but could be diffed.
-- The GitHub org `repofloor` and the remote are **not created yet**; the repo has one local commit on `main`.
 
 ## Immediate next steps (suggested order)
 
-1. Push to `github.com/repofloor/repofloor`, enable Pages (Source: GitHub Actions), confirm the office appears.
-2. Open the 16 starter issues from `docs/GOOD_FIRST_ISSUES.md` with labels; add `good first issue` and area labels.
-3. Phase 1 quick wins: bubble stagger, A* walking, night tint, text alternative under the canvas.
-4. Phase 2 kick-off (Full mode): write `docs/adr/0001-full-mode-stack.md` deciding Supabase vs. self-hosted
+1. Phase 1 quick wins: bubble stagger, A* walking (#5), night tint (#4), text alternative under the canvas (#15).
+2. Phase 2 kick-off (Full mode): write `docs/adr/0001-full-mode-stack.md` deciding Supabase vs. self-hosted
    Postgres+Redis, then bootstrap `apps/api` (GitHub App webhook receiver using `githubToEvents`) first.
 
 ## Decisions already made
