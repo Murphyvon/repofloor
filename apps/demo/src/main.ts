@@ -42,11 +42,73 @@ function log(ev: OfficeEvent) {
   while (logEl.childElementCount > 40) logEl.lastElementChild?.remove();
 }
 
+/** How often the published page looks for a newer snapshot, and how often it ages the one it has. */
+const LITE_POLL_MS = 60_000;
+const LITE_DECAY_MS = 15_000;
+
+async function fetchLite(): Promise<OfficeState | null> {
+  try {
+    // no-store: the page is long-lived and GitHub Pages caches aggressively
+    const r = await fetch("./office-state.json", { cache: "no-store" });
+    if (!r.ok) return null;
+    const json = await r.json();
+    assertOfficeState(json);
+    return json;
+  } catch {
+    return null; // offline, or mid-deploy: keep showing what we have
+  }
+}
+
+/**
+ * Lite has no event stream, so the page polls its own snapshot. The renderer diffs by
+ * actor id, so a newer snapshot makes people walk to their new desk or room instead of
+ * teleporting; between snapshots we re-run decay so an open tab still goes quiet.
+ */
+function runLite(first: OfficeState) {
+  let snapshot = first;
+  const show = () => {
+    state = decay(snapshot, new Date().toISOString());
+    renderer.setState(state);
+  };
+  show();
+  setInterval(show, LITE_DECAY_MS);
+
+  const poll = async () => {
+    if (document.hidden) return; // a background tab costs nothing
+    const next = await fetchLite();
+    if (!next || next.generatedAt === snapshot.generatedAt) return;
+    celebrateMerges(snapshot, next);
+    snapshot = next;
+    modeEl.textContent = `lite · generated ${new Date(next.generatedAt).toLocaleString()}`;
+    show();
+  };
+  setInterval(() => void poll(), LITE_POLL_MS);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) void poll();
+  });
+}
+
+/** The snapshot carries no events, but "celebrating" appearing on someone is a merge. */
+function celebrateMerges(prev: OfficeState, next: OfficeState) {
+  const before = new Map(prev.actors.map((a) => [a.actor.id, a.status]));
+  for (const a of next.actors) {
+    if (a.status === "celebrating" && before.get(a.actor.id) !== "celebrating") {
+      renderer.applyEffect({
+        id: `merge:${a.actor.id}:${next.generatedAt}`,
+        at: next.generatedAt,
+        officeId: next.office.id,
+        type: "pr.merged",
+        number: 0,
+        actorId: a.actor.id,
+      });
+    }
+  }
+}
+
 async function boot() {
   // Lite mode: if ./office-state.json exists next to the page, use it and stop simulating.
-  const lite = await fetch("./office-state.json").then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  const lite = await fetchLite();
   if (lite) {
-    assertOfficeState(lite);
     // shape the page before mounting, so the canvas is sized for the final layout:
     // a published snapshot has no event stream, so the simulator's panel goes away
     document.querySelector("aside")?.remove();
@@ -57,8 +119,7 @@ async function boot() {
     modeEl.textContent = `lite · generated ${new Date(lite.generatedAt).toLocaleString()}`;
 
     await renderer.mount(host);
-    state = decay(lite, new Date().toISOString());
-    renderer.setState(state);
+    runLite(lite);
     return;
   }
 

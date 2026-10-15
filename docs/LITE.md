@@ -33,6 +33,10 @@ Your office lives at `https://<owner>.github.io/<repo>/`. Add it to the README:
   idle, offline.
 - Open PRs and issues on the wall board; the CI lamp shows the default branch status.
 - Hourly cron keeps idle/offline decay honest even when nobody pushes.
+- A tab left open re-reads `office-state.json` every minute (and whenever you come back
+  to the tab), so it follows along without a reload: people walk to their new desk or
+  room, the CI lamp changes, a fresh merge gets its confetti. Between snapshots the page
+  keeps ageing the one it has, so nobody looks busy an hour after they stopped.
 - A camera: drag to pan, scroll (or the +/- buttons) to zoom, double-click to fit the
   whole floor again. A hundred-person office stays readable — zoom in on one corner.
 
