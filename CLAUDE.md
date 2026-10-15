@@ -39,7 +39,7 @@ docs/               ARCHITECTURE, PROTOCOL, LITE, ROADMAP, CONTRIBUTING-adjacent
 1. **Engine never knows the data source.** It consumes `OfficeState`/`OfficeEvent` only. Lite and Full must not fork.
 2. **Reducer is pure.** No I/O, no `Date.now()`; time comes from `event.at`. Every reducer change ships with a test in `packages/reducer/tests/`.
 3. **Protocol changes**: additive → bump minor; breaking → bump major in `PROTOCOL_VERSION` and update `docs/PROTOCOL.md`.
-4. **`apps/lite-action/dist/index.js` must be rebuilt and committed** whenever `packages/*`, `apps/demo` or `apps/lite-action/src` change (CI checks it: `git diff --exit-code apps/lite-action/dist/index.js`). `dist/site/` (the demo build) is committed too; `*.map`, `*.d.ts`, `collect.js`, `main.js` are ignored.
+4. **`apps/lite-action/dist/index.js` must be rebuilt and committed** whenever `packages/*`, `apps/demo` or `apps/lite-action/src` change (CI checks it: `git diff --exit-code apps/lite-action/dist`). `dist/site/` (the demo build) is committed too; `*.map`, `*.d.ts`, `collect.js`, `main.js` are ignored.
 5. **Procedural first.** Default visuals need no asset files. Skins/sprite sheets are optional layers later.
 6. **Mirror GitHub permissions** in Full mode; never invent a second ACL. Not a surveillance tool: show *what*, not *how long*.
 7. ESM only, TypeScript strict (`exactOptionalPropertyTypes` is on except in `packages/engine`, where Pixi types conflict).
