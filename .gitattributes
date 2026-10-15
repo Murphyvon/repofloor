@@ -1,0 +1,4 @@
+* text=auto eol=lf
+*.png binary
+pnpm-lock.yaml linguist-generated=true
+apps/lite-action/dist/** linguist-generated=true
