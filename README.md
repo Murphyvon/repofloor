@@ -47,25 +47,21 @@ Drag to pan, scroll or use the **+ / −** buttons to zoom, double-click to fit 
 name: Repofloor office
 on:
   push: { branches: [main] }
-  pull_request: { types: [opened, closed, reopened, review_requested] }
+  pull_request_target: { types: [opened, closed, reopened, review_requested] }
   schedule: [{ cron: "17 * * * *" }]
   workflow_dispatch:
 permissions: { contents: read, pages: write, id-token: write, actions: read, pull-requests: read, issues: read }
-concurrency: { group: repofloor-office, cancel-in-progress: true }
+concurrency: { group: repofloor-office, cancel-in-progress: false }
 jobs:
-  snapshot:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: repofloor/repofloor/apps/lite-action@main
-      - uses: actions/upload-pages-artifact@v3
-        with: { path: repofloor-site }
-  deploy:
-    needs: snapshot
+  office:
     runs-on: ubuntu-latest
     environment: { name: github-pages, url: "${{ steps.deployment.outputs.page_url }}" }
     steps:
+      - uses: repofloor/repofloor/apps/lite-action@main
+      - uses: actions/upload-pages-artifact@v5
+        with: { path: repofloor-site }
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 ```
 
 2. In the repo's **Settings → Pages**, set *Source* to **GitHub Actions**.

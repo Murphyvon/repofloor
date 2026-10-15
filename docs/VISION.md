@@ -64,6 +64,10 @@ explains *why*; the doc explains *what*. Append, don't rewrite.
 - **2026-10-15 · Not a surveillance tool.** Show *what* people do, never *how long*; detail level is a per-user setting (Full mode).
 - **2026-10-15 · First stack for Full mode is open** — Supabase vs. self-hosted Postgres+Redis to be decided in an ADR
   (`docs/adr/0001-full-mode-stack.md`) before `apps/api` starts. Backend language is free (TypeScript preferred for shared reducer).
+- **2026-10-15 · Lite aims for ~30s freshness, not real time.** One workflow job (snapshot + deploy
+  together), `cancel-in-progress: false` so a running snapshot is never restarted, `pull_request_target`
+  so PR events can publish too, and the page re-reads its snapshot every 15s with a conditional request.
+  The Actions queue is the floor; sub-second presence stays a Full-mode feature.
 
 ## Open questions (for the next conversation)
 
