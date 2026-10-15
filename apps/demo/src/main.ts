@@ -45,6 +45,8 @@ function log(ev: OfficeEvent) {
 /** How often the published page looks for a newer snapshot, and how often it ages the one it has. */
 const LITE_POLL_MS = 60_000;
 const LITE_DECAY_MS = 15_000;
+/** Floor between two fetches: visibilitychange can fire in bursts. */
+const LITE_MIN_GAP_MS = LITE_POLL_MS / 2;
 
 async function fetchLite(): Promise<OfficeState | null> {
   try {
@@ -73,14 +75,24 @@ function runLite(first: OfficeState) {
   show();
   setInterval(show, LITE_DECAY_MS);
 
+  let inFlight = false;
+  let lastPoll = 0;
   const poll = async () => {
-    if (document.hidden) return; // a background tab costs nothing
-    const next = await fetchLite();
-    if (!next || next.generatedAt === snapshot.generatedAt) return;
-    celebrateMerges(snapshot, next);
-    snapshot = next;
-    modeEl.textContent = `lite · generated ${new Date(next.generatedAt).toLocaleString()}`;
-    show();
+    if (document.hidden || inFlight) return; // a background tab costs nothing
+    const now = Date.now();
+    if (now - lastPoll < LITE_MIN_GAP_MS) return;
+    lastPoll = now;
+    inFlight = true;
+    try {
+      const next = await fetchLite();
+      if (!next || next.generatedAt === snapshot.generatedAt) return;
+      celebrateMerges(snapshot, next);
+      snapshot = next;
+      modeEl.textContent = `lite · generated ${new Date(next.generatedAt).toLocaleString()}`;
+      show();
+    } finally {
+      inFlight = false;
+    }
   };
   setInterval(() => void poll(), LITE_POLL_MS);
   document.addEventListener("visibilitychange", () => {
