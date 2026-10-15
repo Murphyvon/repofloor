@@ -6,7 +6,7 @@ A living pixel office for every GitHub repository. Org = building, repo = office
 live presence, rooms, chat, agent telemetry — Phase 2+, not started).
 
 Read `docs/ARCHITECTURE.md` before touching anything beyond a single package.
-Current state and next steps: `docs/HANDOFF.md`.
+Current state and next steps: `docs/HANDOFF.md`. Founder's original requests and the decision log: `docs/VISION.md` (append decisions there).
 
 ## Commands
 
